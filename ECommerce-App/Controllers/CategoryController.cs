@@ -8,93 +8,179 @@ namespace ECommerce_App.Controllers
     [ApiController]
     public class CategoryController : ControllerBase
     {
-        public CategoryService _categoryService;
-        public CategoryController(CategoryService categoryService)
+        private readonly ICategoryService _categoryService;
+
+        public CategoryController(ICategoryService categoryService)
         {
             _categoryService = categoryService;
         }
 
-
-        [HttpGet]
-        [Route("getAllCategories")]
-        [Consumes("application/json")]
-        public async Task<ActionResult> GetCategories()
+        [HttpGet("getAllCategories")]
+        public async Task<IActionResult> GetCategories()
         {
-            var categories = await _categoryService.GetAllCategoriesAsync();
-            return Ok(new { data = categories, status = 200, message = "Gett All Categories Data" });
+            try
+            {
+                var categories = await _categoryService.GetAllCategoriesAsync();
+                return Ok(new
+                {
+                    data = categories,
+                    status = StatusCodes.Status200OK,
+                    message = "Successfully retrieved all categories"
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError,
+                    new { message = $"An error occurred: {ex.Message}" });
+            }
         }
-        [HttpPost]
-        [Route("AddnewCategory")]
+
+        [HttpPost("AddnewCategory")]
         [Consumes("application/json")]
         public async Task<IActionResult> AddCategory([FromBody] CategoryDto request)
         {
             if (!ModelState.IsValid)
             {
-                return BadRequest(ModelState);
+                return BadRequest(new
+                {
+                    status = StatusCodes.Status400BadRequest,
+                    message = "Invalid request data",
+                    errors = ModelState.Values.SelectMany(v => v.Errors)
+                });
             }
-            var category = new Category
+
+            try
             {
-                name = request.name,
-                description = request.description,
-                products = request.products
-            };
-            var check = await _categoryService.CheckCategoryExists(category);
-            if (check == false)
-            {
-                return BadRequest(new { status = 400, message = "Category Already Exists" });
+                var category = new Category
+                {
+                    name = request.name,
+                    description = request.description,
+                    products = request.products
+                };
+
+                if (await _categoryService.CheckCategoryExists(category))
+                {
+                    return Conflict(new
+                    {
+                        status = StatusCodes.Status409Conflict,
+                        message = "Category already exists"
+                    });
+                }
+
+                await _categoryService.CreateAsync(category);
+                return Ok(new
+                {
+                    status = StatusCodes.Status200OK,
+                    message = "Category added successfully",
+                    categoryId = category.id
+                });
             }
-            await _categoryService.CreateAsync(category);
-            return Ok(new { status = 200, message = "Category Added Successfully" });
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError,
+                    new { message = $"Error adding category: {ex.Message}" });
+            }
         }
-        [HttpDelete]
-        [Route("DeleteCategory/{id}")]
-        [Consumes("application/json")]
+
+        [HttpDelete("DeleteCategory/{id}")]
         public async Task<IActionResult> DeleteCategory(string id)
         {
             if (string.IsNullOrEmpty(id))
             {
-                return BadRequest(new { status = 400, message = "Category ID is required" });
+                return BadRequest(new
+                {
+                    status = StatusCodes.Status400BadRequest,
+                    message = "Category ID is required"
+                });
             }
 
-            var delete = await _categoryService.DeleteCategory(id);
-            if(!delete)
+            try
             {
-                return NotFound(new { status = 404, message = "Category not found" });
+                var deleteResult = await _categoryService.DeleteCategory(id);
+                if (!deleteResult)
+                {
+                    return NotFound(new
+                    {
+                        status = StatusCodes.Status404NotFound,
+                        message = "Category not found"
+                    });
+                }
+
+                return Ok(new
+                {
+                    status = StatusCodes.Status200OK,
+                    message = "Category deleted successfully"
+                });
             }
-            return Ok(new { status = 200, message = "Category deleted successfully" });
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError,
+                    new { message = $"Error deleting category: {ex.Message}" });
+            }
         }
-        [HttpPut]
-        [Route("UpdateCategory/{id}")]
-        [Consumes("application/json")]
+
+        [HttpPut("UpdateCategory/{id}")]
         public async Task<IActionResult> UpdateCategory(string id, [FromBody] CategoryDto request)
         {
             if (string.IsNullOrEmpty(id))
             {
-                return BadRequest(new { status = 400, message = "Category ID is required" });
+                return BadRequest(new
+                {
+                    status = StatusCodes.Status400BadRequest,
+                    message = "Category ID is required"
+                });
             }
+
             if (!ModelState.IsValid)
             {
-                return BadRequest(ModelState);
+                return BadRequest(new
+                {
+                    status = StatusCodes.Status400BadRequest,
+                    message = "Invalid request data",
+                    errors = ModelState.Values.SelectMany(v => v.Errors)
+                });
             }
-            var category = new Category
-            {
-                id = id,
-                name = request.name,
-                description = request.description,
-                products = request.products
-            };
-            var check = await _categoryService.CheckUpdateCategoryExists(category);
-            if (check == false)
-            {
-                return BadRequest(new { status = 400, message = "Category Already Exists" });
-            }
-            var updateResult = await _categoryService.UpdateCategory(id, category);
-            if (!updateResult)
-            {
-                return NotFound(new { status = 404, message = "Category not found" });
-            }
-            return Ok(new { status = 200, message = "Category updated successfully" });
-        }
 
+            try
+            {
+                var category = new Category
+                {
+                    id = id,
+                    name = request.name,
+                    description = request.description,
+                    products = request.products
+                };
+
+                if (await _categoryService.CheckUpdateCategoryExists(category))
+                {
+                    return Conflict(new
+                    {
+                        status = StatusCodes.Status409Conflict,
+                        message = "Category already exists with these details"
+                    });
+                }
+
+                var updateResult = await _categoryService.UpdateCategory(id, category);
+                if (!updateResult)
+                {
+                    return NotFound(new
+                    {
+                        status = StatusCodes.Status404NotFound,
+                        message = "Category not found"
+                    });
+                }
+
+                return Ok(new
+                {
+                    status = StatusCodes.Status200OK,
+                    message = "Category updated successfully"
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError,
+                    new { message = $"Error updating category: {ex.Message}" });
+            }
+        }
     }
 }

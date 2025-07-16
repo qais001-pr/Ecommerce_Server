@@ -17,6 +17,7 @@
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="9.0.6" />
     <PackageReference Include="Microsoft.Identity.Client" Version="4.73.1" />
     <PackageReference Include="MongoDB.Driver" Version="3.4.0" />
+    <PackageReference Include="Ngrok.AspNetCore" Version="1.0.6" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
   </ItemGroup>
 

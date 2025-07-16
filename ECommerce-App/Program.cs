@@ -2,69 +2,52 @@
 using ECommerce_App.Services;
 using Microsoft.Extensions.Options;
 using MongoDB.Driver;
+using System.Net;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Listen(IPAddress.Any, 5000);
+    options.Listen(IPAddress.Any, 5001, listenOptions => listenOptions.UseHttps());
+});
 
-// Add services to the container
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Add CORS support
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowReactApp",
-        policy => policy
-            .WithOrigins("http://localhost:5173") // Your React app URL
-            .AllowAnyMethod()
-            .AllowAnyHeader()
-            .AllowCredentials());
-});
-
-// Configuration
-var configuration = builder.Configuration;
-
-// Register MongoDbSettings from configuration with validation
-builder.Services.AddOptions<MongoDbSettings>()
-    .Bind(configuration.GetSection("MongoDbSettings"))
-    .ValidateDataAnnotations()
-    .Validate(settings =>
+    options.AddPolicy("AllowAll", policy =>
     {
-        if (string.IsNullOrEmpty(settings.ConnectionString))
-            return false;
-        return true;
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader();
     });
-
-// Register MongoDB services
-builder.Services.AddSingleton<IMongoClient>(serviceProvider =>
-{
-    var settings = serviceProvider.GetRequiredService<IOptions<MongoDbSettings>>().Value;
-    return new MongoClient(settings.ConnectionString);
 });
 
-builder.Services.AddSingleton<IMongoDatabase>(serviceProvider =>
-{
-    var settings = serviceProvider.GetRequiredService<IOptions<MongoDbSettings>>().Value;
-    var client = serviceProvider.GetRequiredService<IMongoClient>();
-    return client.GetDatabase(settings.DatabaseName);
-});
+builder.Services.Configure<MongoDbSettings>(builder.Configuration.GetSection("MongoDbSettings"));
+builder.Services.AddSingleton<IMongoClient>(sp =>
+    new MongoClient(sp.GetRequiredService<IOptions<MongoDbSettings>>().Value.ConnectionString));
+builder.Services.AddSingleton<IMongoDatabase>(sp =>
+    sp.GetRequiredService<IMongoClient>()
+     .GetDatabase(sp.GetRequiredService<IOptions<MongoDbSettings>>().Value.DatabaseName));
 
-// Register AdminService with health check
-builder.Services.AddSingleton<IAdminService>(serviceProvider =>
+// Your application services
+builder.Services.AddSingleton<IAdminService, AdminService>();
+builder.Services.AddSingleton<ICategoryService, CategoryService>();
+builder.Services.AddSingleton<IProduct, ProductService>();
+builder.Services.AddSingleton<IWhishlists,WhishlistsService>();
+builder.Services.AddSingleton<IUsers,UserServices>();
+builder.Services.AddSingleton<IOrders,OrderServices>();
+builder.Services.AddSingleton<IReview,ReviewService>();
+
+
+
+// Ngrok hosted service only in development
+if (builder.Environment.IsDevelopment())
 {
-    var database = serviceProvider.GetRequiredService<IMongoDatabase>();
-    return new AdminService(database);
-});
-builder.Services.AddSingleton<CategoryService>(serviceProvider =>
-{
-    var database = serviceProvider.GetRequiredService<IMongoDatabase>();
-    return new CategoryService(database);
-});
-builder.Services.AddSingleton<IProduct,ProductService>(productservice =>
-{
-    var database = productservice.GetRequiredService<IMongoDatabase>();
-    return new ProductService(database);
-});
+    builder.Services.AddHostedService<NgrokHostedService>();
+}
 
 var app = builder.Build();
 
@@ -72,13 +55,90 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+    app.UseDeveloperExceptionPage();
 }
 
-app.UseHttpsRedirection();
+//app.UseHttpsRedirection();
 
-app.UseCors("AllowReactApp");
-app.UseDeveloperExceptionPage(); 
+app.UseCors("AllowAll");
 
 app.UseAuthorization();
+
 app.MapControllers();
+
 app.Run();
+
+
+public class NgrokHostedService : IHostedService
+{
+    private readonly ILogger<NgrokHostedService> _logger;
+    private readonly IConfiguration _configuration;
+
+    public NgrokHostedService(ILogger<NgrokHostedService> logger, IConfiguration configuration)
+    {
+        _logger = logger;
+        _configuration = configuration;
+    }
+
+    public async Task StartAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (_configuration.GetValue<bool>("UseNgrok"))
+            {
+                _logger.LogInformation("Starting ngrok tunnel...");
+
+                var options = new NgrokOptions
+                {
+                    AuthToken = _configuration["Ngrok:AuthToken"],
+                    Region = _configuration["Ngrok:Region"] ?? "us"
+                };
+
+                var tunnel = await NgrokTunnel.CreateHttpTunnelAsync(5000, options);
+
+                _logger.LogInformation($"Ngrok tunnel created: {tunnel.PublicUrl}");
+                _logger.LogInformation($"Forwarding to: {tunnel.ForwardedUrl}");
+
+                // Store or use the URL as needed
+                Environment.SetEnvironmentVariable("NGROK_URL", tunnel.PublicUrl);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to start ngrok tunnel");
+        }
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken)
+    {
+        // Cleanup if needed
+        return Task.CompletedTask;
+    }
+}
+
+// Placeholder NgrokTunnel helper class
+public static class NgrokTunnel
+{
+    public static async Task<NgrokTunnelResult> CreateHttpTunnelAsync(int port, NgrokOptions options)
+    {
+        // TODO: Replace with actual ngrok integration (e.g., using Ngrok.Client or CLI)
+        await Task.Delay(100); // Simulate async operation
+        return new NgrokTunnelResult
+        {
+            PublicUrl = $"http://localhost:{port}",
+            ForwardedUrl = $"http://localhost:{port}"
+        };
+    }
+}
+
+public class NgrokOptions
+{
+    public string AuthToken { get; set; }
+    public string Region { get; set; }
+}
+
+public class NgrokTunnelResult
+{
+    public string PublicUrl { get; set; }
+    public string ForwardedUrl { get; set; }
+}

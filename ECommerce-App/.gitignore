@@ -1,12 +1,1 @@
-﻿# Create the .gitignore file with standard C# ignores
-@"
-## Visual Studio
-.vs/
-[Bb]in/
-[Oo]bj/
-*.user
-*.suo
-*.cache
-*.vsidx
-packages/
-"@ > .gitignore
+﻿.vs/

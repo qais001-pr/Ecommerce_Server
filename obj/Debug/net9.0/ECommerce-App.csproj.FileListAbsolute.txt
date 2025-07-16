@@ -1,0 +1,8 @@
+C:\Users\Muhammad-786\Desktop\JS\WEBAPI MONGO\ECommerce-App\obj\Debug\net9.0\ECommerce-App.csproj.AssemblyReference.cache
+C:\Users\Muhammad-786\Desktop\JS\WEBAPI MONGO\ECommerce-App\obj\Debug\net9.0\ECommerce-App.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\Muhammad-786\Desktop\JS\WEBAPI MONGO\ECommerce-App\obj\Debug\net9.0\ECommerce-App.AssemblyInfoInputs.cache
+C:\Users\Muhammad-786\Desktop\JS\WEBAPI MONGO\ECommerce-App\obj\Debug\net9.0\ECommerce-App.AssemblyInfo.cs
+C:\Users\Muhammad-786\Desktop\JS\WEBAPI MONGO\ECommerce-App\obj\Debug\net9.0\ECommerce-App.csproj.CoreCompileInputs.cache
+C:\Users\Muhammad-786\Desktop\JS\WEBAPI MONGO\ECommerce-App\obj\Debug\net9.0\ECommerce-App.MvcApplicationPartsAssemblyInfo.cs
+C:\Users\Muhammad-786\Desktop\JS\WEBAPI MONGO\ECommerce-App\obj\Debug\net9.0\ECommerce-App.MvcApplicationPartsAssemblyInfo.cache
+C:\Users\Muhammad-786\Desktop\JS\WEBAPI MONGO\ECommerce-App\obj\Debug\net9.0\ECommerce-App.sourcelink.json

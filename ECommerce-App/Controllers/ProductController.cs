@@ -9,19 +9,33 @@ namespace ECommerce_App.Controllers
     public class ProductController : ControllerBase
     {
         private readonly IProduct _productService;
+        private readonly ICategoryService _categoryService;
+        private readonly ILogger<ProductController> _logger;
 
-        public ProductController(IProduct productService)
+        public ProductController(
+          IProduct productService,
+          ICategoryService categoryService,
+          ILogger<ProductController> logger)
         {
-            _productService = productService;
+            _productService = productService ?? throw new ArgumentNullException(nameof(productService));
+            _categoryService = categoryService ?? throw new ArgumentNullException(nameof(categoryService));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
-        [HttpPost]
-        [Route("Create")]
+        [HttpPost("Create")]
         [Consumes("application/json")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> CreateProduct([FromBody] ProductCreateDto productDto)
         {
+            _logger.LogInformation("Creating new product");
+
             if (productDto == null)
+            {
+                _logger.LogWarning("CreateProduct called with null DTO");
                 return BadRequest("Product data is required");
+            }
 
             try
             {
@@ -39,64 +53,219 @@ namespace ECommerce_App.Controllers
 
                 if (!string.IsNullOrEmpty(productDto.ImageBase64))
                 {
+                    _logger.LogDebug("Processing product image");
                     var base64Parts = productDto.ImageBase64.Split(',');
                     if (base64Parts.Length != 2)
+                    {
+                        _logger.LogWarning("Invalid image format");
                         return BadRequest("Invalid base64 image format.");
+                    }
 
-                    var contentTypePart = base64Parts[0].Split(':')[1].Split(';')[0];
-                    var base64Data = base64Parts[1];
+                    try
+                    {
+                        var contentTypePart = base64Parts[0].Split(':')[1].Split(';')[0];
+                        var base64Data = base64Parts[1];
 
-                    product.ImageContentType = contentTypePart;
-                    product.ImageExtension = $".{contentTypePart.Split('/')[1]}";
-                    product.ImageBytes = Convert.FromBase64String(base64Data);
+                        product.ImageContentType = contentTypePart;
+                        product.ImageExtension = $".{contentTypePart.Split('/')[1]}";
+                        product.ImageBytes = Convert.FromBase64String(base64Data);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error processing product image");
+                        return BadRequest("Invalid image data format");
+                    }
                 }
 
                 await _productService.CreateAsync(product);
+                await _categoryService.UpdateProductCountByCategory(product.CategoryId);
+
+                _logger.LogInformation("Product created successfully with ID {ProductId}", product.Id);
                 return Ok(new { Id = product.Id });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, $"Error creating product: {ex.Message}");
+                _logger.LogError(ex, "Error creating product");
+                return StatusCode(StatusCodes.Status500InternalServerError, "Error creating product");
             }
         }
 
-
-        [HttpPut]
+        [HttpPut("Update/{id}")]
         [Consumes("application/json")]
-        [Route("Update/{id}")]
-        public async Task<IActionResult> UpdateProduct(string id, ProductCreateDto product)
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> UpdateProduct(string id, [FromBody] ProductCreateDto productDto)
         {
+            _logger.LogInformation("Updating product {ProductId}", id);
+
             if (string.IsNullOrEmpty(id))
-                return BadRequest("Product ID is required");
-            if (product == null)
-                return BadRequest("Product data is required");
-            else
             {
-                var Product = new Product
+                _logger.LogWarning("UpdateProduct called with empty ID");
+                return BadRequest("Product ID is required");
+            }
+
+            if (productDto == null)
+            {
+                _logger.LogWarning("UpdateProduct called with null DTO");
+                return BadRequest("Product data is required");
+            }
+
+            try
+            {
+                var product = new Product
                 {
                     Id = id,
-                    Name = product.Name,
-                    Description = product.Description,
-                    Price = product.Price,
-                    Quantity = product.Quantity,
-                    CategoryId = product.CategoryId,
+                    Name = productDto.Name,
+                    Description = productDto.Description,
+                    Price = productDto.Price,
+                    Quantity = productDto.Quantity,
+                    CategoryId = productDto.CategoryId,
+                    UpdatedAt = DateTime.UtcNow
                 };
-                if (!string.IsNullOrEmpty(product.ImageBase64))
+
+                if (!string.IsNullOrEmpty(productDto.ImageBase64))
                 {
-                    var base64Parts = product.ImageBase64.Split(',');
+                    _logger.LogDebug("Processing product image update");
+                    var base64Parts = productDto.ImageBase64.Split(',');
                     if (base64Parts.Length != 2)
+                    {
+                        _logger.LogWarning("Invalid image format during update");
                         return BadRequest("Invalid base64 image format.");
-                    var contentTypePart = base64Parts[0].Split(':')[1].Split(';')[0];
-                    var base64Data = base64Parts[1];
-                    Product.ImageContentType = contentTypePart;
-                    Product.ImageExtension = $".{contentTypePart.Split('/')[1]}";
-                    Product.ImageBytes = Convert.FromBase64String(base64Data);
+                    }
+
+                    try
+                    {
+                        var contentTypePart = base64Parts[0].Split(':')[1].Split(';')[0];
+                        var base64Data = base64Parts[1];
+                        product.ImageContentType = contentTypePart;
+                        product.ImageExtension = $".{contentTypePart.Split('/')[1]}";
+                        product.ImageBytes = Convert.FromBase64String(base64Data);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error processing product image during update");
+                        return BadRequest("Invalid image data format");
+                    }
                 }
-                await _productService.updateProduct(id, Product);
-                return Ok(new { 
-                    status = 300,
-                    message ="Product Updated Successfully"});
+
+                await _productService.updateProduct(id, product);
+
+                _logger.LogInformation("Product {ProductId} updated successfully", id);
+                return Ok(new
+                {
+                    status = StatusCodes.Status200OK,
+                    message = "Product Updated Successfully"
+                });
             }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating product {ProductId}", id);
+                return StatusCode(StatusCodes.Status500InternalServerError, "Error updating product");
+            }
+        }
+
+        [HttpGet("GetAllProducts")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> GetAllProducts()
+        {
+            _logger.LogInformation("Fetching all products");
+
+            try
+            {
+                var products = await _productService.GetAllProducts();
+
+                _logger.LogInformation("Retrieved {ProductCount} products", products.Count());
+                return Ok(new
+                {
+                    result = products,
+                    status = StatusCodes.Status200OK,
+                    message = "All Products Retrieved Successfully"
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching all products");
+                return StatusCode(StatusCodes.Status500InternalServerError, "Error retrieving products");
+            }
+        }
+
+        [HttpDelete("Delete/{id}")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> DeleteProduct(string id)
+        {
+            _logger.LogInformation("Deleting product {ProductId}", id);
+            if (string.IsNullOrEmpty(id))
+            {
+                _logger.LogWarning("DeleteProduct called with empty ID");
+                return BadRequest("Product ID is required");
+            }
+            try
+            {
+                await _productService.DeleteProduct(id);
+                _logger.LogInformation("Product {ProductId} deleted successfully", id);
+                return Ok(new
+                {
+                    status = StatusCodes.Status200OK,
+                    message = "Product Deleted Successfully"
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deleting product {ProductId}", id);
+                return StatusCode(StatusCodes.Status500InternalServerError, "Error deleting product");
+            }
+        }
+
+        [HttpGet("GetProductByid/{id}")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [Consumes("application/json")]
+        public async Task<IActionResult> GetProduct(string id)
+        {
+            if (string.IsNullOrEmpty(id))
+            {
+                return BadRequest("Product ID is required");
+            }
+            var product = await _productService.GetProductByid(id);
+            return Ok(
+                new
+                {
+                    data = product,
+                    status = 200,
+                    message = "Product Fetched Successfully"
+                }
+                );
+        }
+        [HttpGet]
+        [Route("getProduuctByCAtegoryId/{id}")]
+        public async Task<IActionResult> getProductByCategoryID(string id)
+        {
+            if (string.IsNullOrEmpty(id))
+            {
+                return NotFound();
+            }
+            else
+            {
+                var products = await _productService.GetProductsByCategoriesID(id);
+                return Ok(new { result = products, status = 200 });
+            }
+        }
+        [HttpGet]
+        [Route("getproductDetails/{productid}")]
+        public async Task<IActionResult> getProductDetaiils(string productid)
+        {
+            if (string.IsNullOrWhiteSpace(productid))
+            {
+                throw new ArgumentException("Product id is null");
+            }
+            var list = await _productService.GetProductDetailsJsonAsync(productid);
+
+            return Content(list, "application/json");
         }
     }
 }

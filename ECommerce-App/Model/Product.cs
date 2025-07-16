@@ -1,11 +1,8 @@
 ﻿namespace ECommerce_App.Model
 {
 
-
-    // MongoDB Model
     using MongoDB.Bson;
     using MongoDB.Bson.Serialization.Attributes;
-    using System.ComponentModel.DataAnnotations;
 
     public class Product
     {
@@ -43,8 +40,11 @@
         [BsonElement("updatedAt")]
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
+
+        [BsonRepresentation(BsonType.ObjectId)]
         [BsonElement("categoryid")]
         public string CategoryId { get; set; }
+
     }
     public class ProductCreateDto
     {
@@ -55,5 +55,14 @@
         public string CategoryId { get; set; }
         public string ImageBase64 { get; set; }
     }
+    public class ProductResponseDto
+    {
+        public string Name { get; set; }
+        public string Description { get; set; }
+        public int Quantity { get; set; }
+        public float Price { get; set; }
+        public string CategoryId { get; set; }
+        public string ImageBase64 { get; set; }
 
+    }
 }
