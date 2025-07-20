@@ -8,12 +8,12 @@ namespace ECommerce_App.Services
     {
         Task CreateWhishlist(whishlists whishlists);
     }
-    public class WhishlistsService : IWhishlists
+    public class WishlistsService : IWhishlists
     {
         private readonly IMongoCollection<whishlists> _whishlistsCollection;
-        public WhishlistsService(IMongoDatabase database)
+        public WishlistsService(IMongoDatabase database)
         {
-            _whishlistsCollection = database.GetCollection<whishlists>("whishlists");
+            _whishlistsCollection = database.GetCollection<whishlists>("wishlists");
         }
         public async Task CreateWhishlist(whishlists whishlists)
         {

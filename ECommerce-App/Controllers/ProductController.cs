@@ -1,6 +1,8 @@
 ﻿using ECommerce_App.Model;
 using ECommerce_App.Services;
 using Microsoft.AspNetCore.Mvc;
+using MongoDB.Bson;
+using MongoDB.Bson.IO;
 
 namespace ECommerce_App.Controllers
 {
@@ -192,11 +194,7 @@ namespace ECommerce_App.Controllers
         }
 
         [HttpDelete("Delete/{id}")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> DeleteProduct(string id)
+        public async Task<IActionResult> DeleteProduct(string id, [FromQuery] string categoryId)
         {
             _logger.LogInformation("Deleting product {ProductId}", id);
             if (string.IsNullOrEmpty(id))
@@ -207,6 +205,7 @@ namespace ECommerce_App.Controllers
             try
             {
                 await _productService.DeleteProduct(id);
+                await _categoryService.UpdateProductCountByCategory(categoryId);
                 _logger.LogInformation("Product {ProductId} deleted successfully", id);
                 return Ok(new
                 {
@@ -256,16 +255,58 @@ namespace ECommerce_App.Controllers
             }
         }
         [HttpGet]
-        [Route("getproductDetails/{productid}")]
-        public async Task<IActionResult> getProductDetaiils(string productid)
+        [Route("getproductDetails/{productId}")]
+        public async Task<IActionResult> GetProductDetails(string productId)
         {
-            if (string.IsNullOrWhiteSpace(productid))
+            if (string.IsNullOrWhiteSpace(productId))
             {
-                throw new ArgumentException("Product id is null");
+                return BadRequest("Product ID cannot be null or empty");
             }
-            var list = await _productService.GetProductDetailsJsonAsync(productid);
 
-            return Content(list, "application/json");
+            if (!ObjectId.TryParse(productId, out _))
+            {
+                return BadRequest("Invalid Product ID format");
+            }
+
+            try
+            {
+                var productDocument = await _productService.GetProductDetailsAsync(productId);
+
+                if (productDocument == null)
+                {
+                    return NotFound($"Product with ID {productId} not found");
+                }
+                var jsonSettings = new JsonWriterSettings
+                {
+                    Indent = true,
+                };
+
+                return Content(productDocument.ToJson(jsonSettings), "application/json");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching product details for {ProductId}", productId);
+                return StatusCode(
+                    StatusCodes.Status500InternalServerError,
+                    "An error occurred while processing your request");
+            }
+        }
+
+
+        [HttpGet]
+        [Route("getsearchproducts/{name}")]
+        public async Task<IActionResult> searchproduct(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return BadRequest(new { status = 400, message = "name is Empty" });
+            }
+            var result = await _productService.searchproducts(name);
+            var jsonsettings = new JsonWriterSettings
+            {
+                Indent=true,
+            };
+            return Content(result.ToJson(jsonsettings), "application/json");
         }
     }
 }

@@ -1,5 +1,5 @@
-﻿using MongoDB.Bson.Serialization.Attributes;
-using MongoDB.Bson;
+﻿using MongoDB.Bson;
+using MongoDB.Bson.Serialization.Attributes;
 using System.ComponentModel.DataAnnotations;
 namespace ECommerce_App.Model
 {
@@ -27,6 +27,9 @@ namespace ECommerce_App.Model
         [Required]
         [BsonElement("Password")]
         public string password { get; set; }
+        [Required]
+        [BsonElement("imageBytes")]
+        public string imageBytes { get; set; }
     }
     public class CreateUserDTO
     {
@@ -42,6 +45,9 @@ namespace ECommerce_App.Model
         public string password { get; set; }
         [Required]
         public string localaddress { get; set; }
+
+        [Required]
+        public string image { get; set; }
     }
     public class ResponseUserDTO
     {
@@ -52,5 +58,13 @@ namespace ECommerce_App.Model
         public string email { get; set; }
         public string password { get; set; }
         public string localaddress { get; set; }
+    }
+
+    public class UserLoginDTO
+    {
+        [Required]
+        public string email { get; set; }
+        [Required]
+        public string password { get; set; }
     }
 }

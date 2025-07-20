@@ -6,10 +6,10 @@ namespace ECommerce_App.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class WhishlistsController : ControllerBase
+    public class WishlistsController : ControllerBase
     {
         public readonly IWhishlists whishlists;
-        public WhishlistsController(IWhishlists whishlists)
+        public WishlistsController(IWhishlists whishlists)
         {
             this.whishlists = whishlists;
         }

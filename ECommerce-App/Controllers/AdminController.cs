@@ -25,7 +25,6 @@ namespace ECommerce_App.Controllers
                     {
                         status = 401,
                         Message = "Invalid email",
-                        data = (object)null // Add for consistency
                     });
                 }
 
@@ -36,7 +35,6 @@ namespace ECommerce_App.Controllers
                     {
                         status = 401,
                         Message = "Invalid password",
-                        data = (object)null
                     });
                 }
 
@@ -54,7 +52,6 @@ namespace ECommerce_App.Controllers
                     status = 400,
                     Message = "Login failed",
                     Error = ex.Message,
-                    data = (object)null
                 });
             }
             catch (Exception ex)
@@ -64,7 +61,6 @@ namespace ECommerce_App.Controllers
                     status = 500,
                     Message = "An error occurred while processing your request",
                     Error = ex.Message,
-                    data = (object)null
                 });
             }
         }

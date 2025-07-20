@@ -1,8 +1,6 @@
 ﻿using ECommerce_App.Model;
 using MongoDB.Bson;
-using MongoDB.Bson.IO;
 using MongoDB.Driver;
-using Newtonsoft.Json;
 
 namespace ECommerce_App.Services
 {
@@ -15,7 +13,8 @@ namespace ECommerce_App.Services
         Task<Product?> GetProductByid(string id);
 
         Task<IEnumerable<Product>> GetProductsByCategoriesID(string categoryid);
-        Task<string?> GetProductDetailsJsonAsync(string productid);
+        Task<BsonDocument> GetProductDetailsAsync(string productid);
+        Task<BsonDocument> searchproducts(string name);
 
     }
     public class ProductService : IProduct
@@ -88,40 +87,163 @@ namespace ECommerce_App.Services
             var products = await _productCollection.Find(c => c.CategoryId == categoryid).ToListAsync();
             return products;
         }
-
-
-        public async Task<string?> GetProductDetailsJsonAsync(string productid)
+        public async Task<BsonDocument?> GetProductDetailsAsync(string productId)
         {
-            var id = new ObjectId(productid);
-            var pipeline = new[]
+            if (string.IsNullOrWhiteSpace(productId))
             {
-        new BsonDocument("$match", new BsonDocument("_id", id)),
-        new BsonDocument("$lookup", new BsonDocument
+                throw new ArgumentException("Product ID cannot be null or empty", nameof(productId));
+            }
+
+            if (!ObjectId.TryParse(productId, out var id))
+            {
+                throw new ArgumentException("Invalid Product ID format", nameof(productId));
+            }
+
+            try
+            {
+                var pipeline = new[]
+                {
+            new BsonDocument("$match", new BsonDocument("_id", id)),
+            new BsonDocument("$lookup", new BsonDocument
+            {
+                { "from", "Categories" },
+                { "localField", "categoryid" },
+                { "foreignField", "_id" },
+                { "as", "Categories" }
+            }),
+            new BsonDocument("$lookup", new BsonDocument
+            {
+                { "from", "Review" },
+                { "localField", "_id" },
+                { "foreignField", "Productid" },
+                { "as", "reviewsData" }
+            }),
+            new BsonDocument("$unwind", new BsonDocument
+            {
+                { "path", "$reviewsData" },
+                { "preserveNullAndEmptyArrays", true }
+            }),
+            new BsonDocument("$lookup", new BsonDocument
+            {
+                { "from", "User" },
+                { "localField", "reviewsData.Userid" },
+                { "foreignField", "_id" },
+                { "as", "reviewsData.User" }
+            }),
+            new BsonDocument("$unwind", new BsonDocument
+            {
+                { "path", "$reviewsData.User" },
+                { "preserveNullAndEmptyArrays", true }
+            }),
+            new BsonDocument("$group", new BsonDocument
+            {
+                { "_id", "$_id" },
+                { "productDetails", new BsonDocument("$first", "$$ROOT") },
+                { "Categories", new BsonDocument("$first", "$Categories") },
+                { "reviewsData", new BsonDocument("$push", "$reviewsData") }
+            }),
+            new BsonDocument("$project", new BsonDocument
+            {
+                { "_id", 1 },
+                { "name", "$productDetails.name" },
+                { "description", "$productDetails.description" },
+                { "price", "$productDetails.price" },
+                { "rating", "$productDetails.rating" },
+                { "image", "$productDetails.imageBytes" },
+                { "imageContent", "$productDetails.imageContentType" },
+                { "quantity", "$productDetails.quantity" },
+                { "Categories", 1 },
+                { "reviewsData", 1 }
+            })
+        };
+
+                var result = await _productCollection.Aggregate<BsonDocument>(pipeline).ToListAsync();
+                return result.FirstOrDefault();
+            }
+            catch (MongoException ex)
+            {
+                throw new ApplicationException("Error accessing database", ex);
+            }
+            catch (Exception ex)
+            {
+                throw new ApplicationException("An unexpected error occurred", ex);
+            }
+        }
+        public async Task<BsonDocument> searchproducts(string name)
         {
-            { "from", "Category" },
-            { "localField", "categoryid" },
-            { "foreignField", "_id" },
-            { "as", "categories" }
-        }),
-        new BsonDocument("$lookup", new BsonDocument
-        {
-            { "from", "Review" },
-            { "localField", "_id" },
-            { "foreignField", "Productid" },
-            { "as", "Reviews" }
-        })
-    };
+            try
+            {
+                var pipeline = new[]
+                {
+            new BsonDocument("$match",
+             new BsonDocument
+             (
+                 "name",new BsonDocument{{"$regex",$"^{name}"},{"$options","i"} }
+             )),
+            new BsonDocument("$lookup", new BsonDocument
+            {
+                { "from", "Categories" },
+                { "localField", "categoryid" },
+                { "foreignField", "_id" },
+                { "as", "Categories" }
+            }),
+            new BsonDocument("$lookup", new BsonDocument
+            {
+                { "from", "Review" },
+                { "localField", "_id" },
+                { "foreignField", "Productid" },
+                { "as", "reviewsData" }
+            }),
+            new BsonDocument("$unwind", new BsonDocument
+            {
+                { "path", "$reviewsData" },
+                { "preserveNullAndEmptyArrays", true }
+            }),
+            new BsonDocument("$lookup", new BsonDocument
+            {
+                { "from", "User" },
+                { "localField", "reviewsData.Userid" },
+                { "foreignField", "_id" },
+                { "as", "reviewsData.User" }
+            }),
+            new BsonDocument("$unwind", new BsonDocument
+            {
+                { "path", "$reviewsData.User" },
+                { "preserveNullAndEmptyArrays", true }
+            }),
+            new BsonDocument("$group", new BsonDocument
+            {
+                { "_id", "$_id" },
+                { "productDetails", new BsonDocument("$first", "$$ROOT") },
+                { "Categories", new BsonDocument("$first", "$Categories") },
+                { "reviewsData", new BsonDocument("$push", "$reviewsData") }
+            }),
+            new BsonDocument("$project", new BsonDocument
+            {
+                { "_id", 1 },
+                { "name", "$productDetails.name" },
+                { "description", "$productDetails.description" },
+                { "price", "$productDetails.price" },
+                { "rating", "$productDetails.rating" },
+                { "image", "$productDetails.imageBytes" },
+                { "imageContent", "$productDetails.imageContentType" },
+                { "quantity", "$productDetails.quantity" },
+                { "Categories", 1 },
+                { "reviewsData", 1 }
+            })
+        };
 
-            var cursor = await _productCollection.AggregateAsync<BsonDocument>(pipeline);
-            var list = await cursor.ToListAsync();
-
-            var doc = list.FirstOrDefault();
-
-            if (doc == null)
-                return null;
-
-            // Return pretty formatted JSON string
-            return doc.ToJson(new JsonWriterSettings { Indent = true });
+                var result = await _productCollection.Aggregate<BsonDocument>(pipeline).ToListAsync();
+                return result.FirstOrDefault();
+            }
+            catch (MongoException ex)
+            {
+                throw new ApplicationException("Error accessing database", ex);
+            }
+            catch (Exception ex)
+            {
+                throw new ApplicationException("An unexpected error occurred", ex);
+            }
         }
     }
 }

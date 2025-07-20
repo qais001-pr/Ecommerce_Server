@@ -36,7 +36,7 @@ builder.Services.AddSingleton<IMongoDatabase>(sp =>
 builder.Services.AddSingleton<IAdminService, AdminService>();
 builder.Services.AddSingleton<ICategoryService, CategoryService>();
 builder.Services.AddSingleton<IProduct, ProductService>();
-builder.Services.AddSingleton<IWhishlists,WhishlistsService>();
+builder.Services.AddSingleton<IWhishlists,WishlistsService>();
 builder.Services.AddSingleton<IUsers,UserServices>();
 builder.Services.AddSingleton<IOrders,OrderServices>();
 builder.Services.AddSingleton<IReview,ReviewService>();
